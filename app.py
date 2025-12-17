@@ -3,55 +3,61 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 from sklearn.preprocessing import StandardScaler, LabelEncoder
-import joblib  # for loading saved scaler/encoder if used
 
 # -----------------------------
-# Load model and preprocessors
+# Page config
 # -----------------------------
-@st.cache_data
-def load_model_and_preprocessors():
-    model = tf.keras.models.load_model("har_cnn_model.h5")
-    scaler = joblib.load("scaler.save")       # optional, if you used StandardScaler
-    label_encoder = joblib.load("encoder.save")  # optional, if you encoded labels
-    return model, scaler, label_encoder
-
-model, scaler, label_encoder = load_model_and_preprocessors()
-
-st.title("🏃 Human Activity Recognition (Single Prediction)")
+st.set_page_config(page_title="Human Activity Recognition", layout="centered")
+st.title("🏃 Human Activity Recognition (CNN)")
+st.write("Upload sensor CSV to predict activities")
 
 # -----------------------------
-# User input
+# Load trained model and preprocessors
 # -----------------------------
-# Example: if your model expects 1 feature per timestep
-user_input = st.text_input("Enter feature values separated by comma (e.g., 0.12):")
+model = tf.keras.models.load_model("har_cnn_model.h5")
 
-if st.button("Predict Activity"):
-    try:
-        # Convert input string to numpy array
-        data = np.array([float(x.strip()) for x in user_input.split(",")])
+# Load scaler and label encoder if you have saved them
+# Example:
+# import joblib
+# scaler = joblib.load("scaler.save")
+# label_encoder = joblib.load("label_encoder.save")
+
+# For demonstration, create dummy scaler and encoder
+scaler = StandardScaler()
+label_encoder = LabelEncoder()
+label_encoder.classes_ = np.array(['sitting','standing','walking','running'])  # example classes
+
+# -----------------------------
+# Upload CSV
+# -----------------------------
+uploaded_file = st.file_uploader("Upload your sensor CSV", type=["csv"])
+
+if uploaded_file:
+    df = pd.read_csv(uploaded_file)
+    
+    # Make sure you select only the column your model was trained on
+    # For example, 'acc_x'
+    if 'acc_x' not in df.columns:
+        st.error("CSV must contain 'acc_x' column")
+    else:
+        X_new = df[['acc_x']].values  # shape (num_samples, 1)
         
-        # Ensure input is 1D
-        data = data.reshape(1, -1)  # shape (1, num_features)
+        # Apply scaler if used during training
+        X_new = scaler.fit_transform(X_new)  # replace fit_transform with transform if scaler is pre-fitted
         
-        # Scale input if scaler was used
-        if scaler:
-            data = scaler.transform(data)
+        # Reshape to match model input: (batch_size, timesteps, features)
+        X_new_correct = X_new.reshape(-1, 1, 1)
         
-        # Reshape to model expected shape (batch_size, timesteps, features)
-        # Adjust these numbers to match your model input
-        data = data.reshape(1, 1, 1)  # (1 sample, 1 timestep, 1 feature)
-
         # Predict
-        pred_probs = model.predict(data)
-        pred_class = np.argmax(pred_probs, axis=1)
+        y_pred = model.predict(X_new_correct)
         
-        # Decode label if LabelEncoder was used
-        if label_encoder:
-            activity = label_encoder.inverse_transform(pred_class)[0]
+        # Convert predicted probabilities to labels if using softmax
+        if y_pred.shape[1] > 1:
+            y_classes = np.argmax(y_pred, axis=1)
+            y_labels = label_encoder.inverse_transform(y_classes)
         else:
-            activity = str(pred_class[0])
+            y_labels = (y_pred > 0.5).astype(int)
         
-        st.success(f"Predicted Activity: {activity}")
-
-    except Exception as e:
-        st.error(f"Error: {e}")
+        # Display results
+        st.write("Predicted Activities:")
+        st.write(y_labels)
