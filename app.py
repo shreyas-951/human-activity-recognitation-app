@@ -14,7 +14,7 @@ st.title("🏃 Human Activity Recognition (CNN)")
 st.write("Upload sensor data CSV to predict activities")
 
 # -----------------------------
-# Load trained model (SAFE PATH)
+# Load trained model
 # -----------------------------
 @st.cache_resource
 def load_model():
@@ -24,37 +24,37 @@ def load_model():
         st.stop()
     return tf.keras.models.load_model(model_path)
 
-model = load_model()
-
-scaler, label_encoder, num_features = load_preprocessors()
 # -----------------------------
-# Fit scaler & label encoder
+# Load preprocessors (scaler + label encoder + num_features)
 # -----------------------------
-@st.cache_resource
 @st.cache_resource
 def load_preprocessors():
     df = pd.read_csv("Training_set.csv")
 
-    # ✅ This column has words like walking, sitting
+    # Activity column
     y = df["activity"]
 
-    # ❌ Remove text column
+    # Features: remove activity column & any non-numeric columns
     X = df.drop(columns=["activity"])
-
-    # ❌ Remove any other text columns automatically
     X = X.select_dtypes(include=[np.number])
 
-    # ✅ Convert activity names to numbers
+    # Label encoder
     label_encoder = LabelEncoder()
     label_encoder.fit(y)
 
-    # ✅ Scale ONLY numbers
+    # Scaler
     scaler = StandardScaler()
     scaler.fit(X)
 
     num_features = X.shape[1]
 
     return scaler, label_encoder, num_features
+
+# -----------------------------
+# Initialize model and preprocessors
+# -----------------------------
+model = load_model()
+scaler, label_encoder, num_features = load_preprocessors()
 
 # -----------------------------
 # File upload
@@ -109,6 +109,3 @@ if uploaded_file is not None:
 # -----------------------------
 st.markdown("---")
 st.caption("CNN-based Human Activity Recognition using Streamlit")
-
-
-
