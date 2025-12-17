@@ -2,6 +2,7 @@ import streamlit as st
 import numpy as np
 import pandas as pd
 import tensorflow as tf
+import os
 
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 
@@ -13,33 +14,62 @@ st.title("🏃 Human Activity Recognition (CNN)")
 st.write("Upload sensor data CSV to predict activities")
 
 # -----------------------------
-# Load trained model
+# Load trained model (SAFE PATH)
 # -----------------------------
 @st.cache_resource
-def load_model():
-    return tf.keras.models.load_model("har_cnn_model.h5")
+def load_preprocessors():
+    df = pd.read_csv("Training_set.csv")
+
+    # target
+    y = df["activity"]
+
+    # features
+    X = df.drop(columns=["activity"])
+    X = X.select_dtypes(include=[np.number])
+
+    # label encoder
+    label_encoder = LabelEncoder()
+    label_encoder.fit(y)
+
+    # scaler
+    scaler = StandardScaler()
+    scaler.fit(X)
+
+    num_features = X.shape[1]
+
+    return scaler, label_encoder, num_features
 
 model = load_model()
 
+scaler, label_encoder, num_features = load_preprocessors()
 # -----------------------------
 # Fit scaler & label encoder
 # -----------------------------
 @st.cache_resource
+@st.cache_resource
 def load_preprocessors():
-    train_df = pd.read_csv("Training_set.csv")
+    df = pd.read_csv("Training_set.csv")
 
-    X = train_df.iloc[:, :-1].values
-    y = train_df.iloc[:, -1].values
+    # ✅ This column has words like walking, sitting
+    y = df["activity"]
 
+    # ❌ Remove text column
+    X = df.drop(columns=["activity"])
+
+    # ❌ Remove any other text columns automatically
+    X = X.select_dtypes(include=[np.number])
+
+    # ✅ Convert activity names to numbers
+    label_encoder = LabelEncoder()
+    label_encoder.fit(y)
+
+    # ✅ Scale ONLY numbers
     scaler = StandardScaler()
-    X = scaler.fit_transform(X)
+    scaler.fit(X)
 
-    le = LabelEncoder()
-    le.fit(y)
+    num_features = X.shape[1]
 
-    return scaler, le, X.shape[1]
-
-scaler, label_encoder, num_features = load_preprocessors()
+    return scaler, label_encoder, num_features
 
 # -----------------------------
 # File upload
@@ -51,11 +81,10 @@ uploaded_file = st.file_uploader(
 
 if uploaded_file is not None:
     try:
-        # Read file
         test_df = pd.read_csv(uploaded_file)
-        st.success("CSV uploaded successfully!")
+        st.success("✅ CSV uploaded successfully!")
 
-        # Check feature count
+        # Feature validation
         if test_df.shape[1] != num_features:
             st.error(
                 f"❌ Feature mismatch! Expected {num_features} columns, "
@@ -76,15 +105,15 @@ if uploaded_file is not None:
             results_df["Predicted Activity"] = predicted_labels
 
             st.subheader("✅ Prediction Results")
-            st.dataframe(results_df)
+            st.dataframe(results_df, use_container_width=True)
 
             # Download button
             csv = results_df.to_csv(index=False).encode("utf-8")
             st.download_button(
-                label="⬇️ Download Predictions",
-                data=csv,
-                file_name="har_predictions.csv",
-                mime="text/csv"
+                "⬇️ Download Predictions",
+                csv,
+                "har_predictions.csv",
+                "text/csv"
             )
 
     except Exception as e:
@@ -95,3 +124,5 @@ if uploaded_file is not None:
 # -----------------------------
 st.markdown("---")
 st.caption("CNN-based Human Activity Recognition using Streamlit")
+
+
