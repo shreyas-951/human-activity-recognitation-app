@@ -17,27 +17,12 @@ st.write("Upload sensor data CSV to predict activities")
 # Load trained model (SAFE PATH)
 # -----------------------------
 @st.cache_resource
-def load_preprocessors():
-    df = pd.read_csv("Training_set.csv")
-
-    # target
-    y = df["activity"]
-
-    # features
-    X = df.drop(columns=["activity"])
-    X = X.select_dtypes(include=[np.number])
-
-    # label encoder
-    label_encoder = LabelEncoder()
-    label_encoder.fit(y)
-
-    # scaler
-    scaler = StandardScaler()
-    scaler.fit(X)
-
-    num_features = X.shape[1]
-
-    return scaler, label_encoder, num_features
+def load_model():
+    model_path = os.path.join(os.path.dirname(__file__), "har_cnn_model.h5")
+    if not os.path.exists(model_path):
+        st.error("❌ har_cnn_model.h5 NOT FOUND in project folder")
+        st.stop()
+    return tf.keras.models.load_model(model_path)
 
 model = load_model()
 
@@ -124,5 +109,6 @@ if uploaded_file is not None:
 # -----------------------------
 st.markdown("---")
 st.caption("CNN-based Human Activity Recognition using Streamlit")
+
 
 
