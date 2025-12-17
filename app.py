@@ -3,7 +3,6 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 import os
-
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 
 # -----------------------------
@@ -24,36 +23,33 @@ def load_model():
         st.stop()
     return tf.keras.models.load_model(model_path)
 
+model = load_model()
+
 # -----------------------------
-# Load preprocessors (scaler + label encoder + num_features)
+# Load preprocessors
 # -----------------------------
 @st.cache_resource
 def load_preprocessors():
     df = pd.read_csv("Training_set.csv")
+    
+    # ✅ Last column is the label
+    y = df.iloc[:, -1]        # use last column 'label'
+    X = df.iloc[:, :-1]       # all other columns are features
 
-    # Activity column
-    y = df["activity"]
-
-    # Features: remove activity column & any non-numeric columns
-    X = df.drop(columns=["activity"])
+    # ❌ Keep numeric columns only
     X = X.select_dtypes(include=[np.number])
 
-    # Label encoder
+    # ✅ Label encode activities
     label_encoder = LabelEncoder()
     label_encoder.fit(y)
 
-    # Scaler
+    # ✅ Scale features
     scaler = StandardScaler()
     scaler.fit(X)
 
     num_features = X.shape[1]
-
     return scaler, label_encoder, num_features
 
-# -----------------------------
-# Initialize model and preprocessors
-# -----------------------------
-model = load_model()
 scaler, label_encoder, num_features = load_preprocessors()
 
 # -----------------------------
@@ -69,15 +65,18 @@ if uploaded_file is not None:
         test_df = pd.read_csv(uploaded_file)
         st.success("✅ CSV uploaded successfully!")
 
+        # Keep numeric columns only
+        X_test = test_df.select_dtypes(include=[np.number])
+
         # Feature validation
-        if test_df.shape[1] != num_features:
+        if X_test.shape[1] != num_features:
             st.error(
                 f"❌ Feature mismatch! Expected {num_features} columns, "
-                f"but got {test_df.shape[1]}"
+                f"but got {X_test.shape[1]}"
             )
         else:
             # Preprocess
-            X_test = scaler.transform(test_df.values)
+            X_test = scaler.transform(X_test)
             X_test = X_test.reshape(X_test.shape[0], X_test.shape[1], 1)
 
             # Predict
